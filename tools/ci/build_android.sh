@@ -70,6 +70,9 @@ if [[ ! -s "$OUTPUT_APK" ]]; then
   echo "::error::Export failed - no APK produced. See log above."
   exit 1
 fi
-"$ANDROID_SDK_ROOT"/build-tools/*/apksigner verify "$OUTPUT_APK"
+# The runner image ships several build-tools versions; use the newest one
+# (a bare */apksigner glob would expand to multiple paths and break the call).
+APKSIGNER="$(ls -d "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | sort -V | tail -n 1)"
+"$APKSIGNER" verify "$OUTPUT_APK"
 ls -lh "$OUTPUT_APK"
 echo "APK ready: $OUTPUT_APK (version $VERSION_NAME / code $VERSION_CODE)"

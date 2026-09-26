@@ -1,0 +1,112 @@
+# Manually build the Android APK and publish it as a GitHub Release.
+# Run it from: GitHub -> Actions -> "Build Android APK" -> Run workflow.
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: "Version name shown in the app and used for the release tag (e.g. 0.1.0)"
+        required: true
+        default: "0.1.0"
+      prerelease:
+        description: "Mark the release as a pre-release"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write # create the release + upload the APK
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: "4.6"
+  GODOT_TAG: "4.6-stable"
+  BUILD_TOOLS: "34.0.0"
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Validate version
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+        run: |
+          if [[ ! "$VERSION_NAME" =~ ^[0-9A-Za-z.\-]+$ ]]; then
+            echo "::error::version_name may only contain letters, digits, dots and dashes"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Android build-tools
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;${BUILD_TOOLS}" "platform-tools" > /dev/null
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+
+      - name: Cache Godot + Android export templates
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot-bin
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_TAG }}-android-templates
+
+      - name: Download Godot ${{ env.GODOT_VERSION }}
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_TAG}"
+          mkdir -p ~/godot-bin
+          curl -sSL -o godot.zip "$base/Godot_v${GODOT_TAG}_linux.x86_64.zip"
+          unzip -q godot.zip -d ~/godot-bin
+          mv ~/godot-bin/Godot_v${GODOT_TAG}_linux.x86_64 ~/godot-bin/godot
+          rm godot.zip
+          tpl=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mkdir -p "$tpl"
+          curl -sSL -o templates.tpz "$base/Godot_v${GODOT_TAG}_export_templates.tpz"
+          # only the Android templates are needed (saves ~1 GB of cache)
+          unzip -o -j -q templates.tpz templates/android_debug.apk templates/android_release.apk templates/version.txt -d "$tpl"
+          rm templates.tpz
+
+      - name: Build APK
+        env:
+          GODOT_BIN: /home/runner/godot-bin/godot
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ github.run_number }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          chmod +x ~/godot-bin/godot tools/ci/build_android.sh
+          OUTPUT_APK="build/CrowdRush-v${VERSION_NAME}.apk" tools/ci/build_android.sh
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CrowdRush-v${{ inputs.version_name }}-apk
+          path: build/*.apk
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version_name }}
+          name: Crowd Rush v${{ inputs.version_name }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ inputs.prerelease }}
+          files: build/*.apk
+          body: |
+            Android APK for **Crowd Rush v${{ inputs.version_name }}** (build ${{ github.run_number }}, commit ${{ github.sha }}).
+
+            **Install:** download `CrowdRush-v${{ inputs.version_name }}.apk` below on your phone, open it, and allow "Install unknown apps" for your browser/file manager when asked.
+
+            Architectures: arm64-v8a, armeabi-v7a · Min Android 7.0 · No permissions · Works fully offline.

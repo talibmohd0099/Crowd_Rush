@@ -30,6 +30,9 @@ void fragment() {
 		p = step(0.5, v) * 0.26;
 	}
 	float pulse = highlight * (0.5 + 0.5 * sin(TIME * 8.0)) * 0.25;
-	ALBEDO = color.rgb * (1.0 + edge * 0.6) + vec3(pulse);
-	ALPHA = clamp((0.22 + p + edge * 0.55 + pulse) * intensity, 0.0, 1.0);
+	// fairly solid, glowing panel (reads like a neon sign on a phone screen):
+	// brighter towards the bottom and edges, HDR edges feed the glow pass
+	float grad = mix(0.8, 1.15, uv.y);
+	ALBEDO = color.rgb * (grad + edge * 1.1 + p * 0.8) + vec3(pulse);
+	ALPHA = clamp((0.5 + p + edge * 0.5 + pulse) * intensity, 0.0, 1.0);
 }

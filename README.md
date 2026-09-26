@@ -14,7 +14,7 @@ runs 4 gates + 1 obstacle, and ends with the GIANT GUARD boss fight and a result
 ## 1. Project files
 
 ```
-project.godot            Mobile renderer, Jolt, landscape, touch-from-mouse, 1280x720 base
+project.godot            Mobile renderer, Jolt, portrait, touch-from-mouse, 720x1280 base
 export_presets.cfg       Android preset (arm64-v8a + armeabi-v7a)
 icon.svg
 scenes/
@@ -181,6 +181,7 @@ lean/turn into the motion. A/D or arrow keys also steer for development.
 
 Debug keys (debug builds only): **F1** reset, **F2** +10, **F3** −10, **F4** jump to boss,
 **F5** ×2 effect, **F6** debug overlay (FPS, crowd, active physics actors, draw calls).
+On a phone, a three-finger tap toggles the same overlay.
 Set `Main → debug_tools_enabled = false` to remove them.
 
 Headless smoke tests (optional):
@@ -198,7 +199,7 @@ godot --headless --path . -s tools/perf_test.gd                               # 
 4. **Project → Export → Android** (preset already provided): set a keystore for release
    (debug keystore is used automatically for debug exports), then *Export Project* → `export/CrowdRush.apk`,
    or use the one-click deploy button with a USB-debugging device connected.
-   Orientation comes from `display/window/handheld/orientation = sensor landscape`; immersive mode is on;
+   Orientation comes from `display/window/handheld/orientation = portrait`; immersive mode is on;
    no permissions are requested (not even INTERNET).
 
 ### Build the APK on GitHub (no local setup)
@@ -241,8 +242,12 @@ The same build runs locally with `tools/ci/build_android.sh` (see the variables 
   (150 celebrating with uncached poses: 1.25 ms). Expect roughly 3–5× on mid-range Android.
 * **Draw calls**: whole crowd 8 (+shadow), each building type/prop type is one MultiMesh; ~120–160 draw
   calls in the busiest shots including shadows, UI and particles.
-* One directional light, 2-split shadows limited to 70 units, 2048 shadow map, no SSAO/SSR/SDFGI/volumetrics,
+* One directional light, a single shadow cascade limited to 45 units, 2048 shadow map, no SSAO/SSR/SDFGI/volumetrics,
   cheap exponential fog, light glow. MSAA 2×.
+* On phones the 3D scene renders at 80 % resolution (`rendering/scaling_3d/scale.mobile`, UI stays sharp)
+  and the frame rate is capped at 60 (`application/run/max_fps`) so 90/120 Hz screens get steady pacing.
+* The crowd does not cast real shadows (`CrowdManager.cast_shadows = false`); its blob shadows ground it.
+* **FPS on a real phone:** tap the screen with three fingers to toggle the overlay (works in release APKs).
 * Physics: at most 24 runner actors + ~12 barricade/prop bodies + the hammer; everything is frozen or pooled
   when idle. Jolt runs at 60 Hz.
 * Particles are CPUParticles3D pools (≤140 particles per burst, confetti only at the end).

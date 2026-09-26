@@ -100,9 +100,10 @@ func _build_lighting() -> void:
 	sun.shadow_enabled = enable_shadows
 	sun.shadow_blur = 1.2
 	sun.shadow_opacity = 0.75
-	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-	sun.directional_shadow_max_distance = 70.0
-	sun.directional_shadow_split_1 = 0.25
+	# one shadow cascade over a short range: a second cascade re-renders the
+	# whole street into the shadow map every frame, which phones feel
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+	sun.directional_shadow_max_distance = 45.0
 	sun.shadow_bias = 0.08
 	add_child(sun)
 

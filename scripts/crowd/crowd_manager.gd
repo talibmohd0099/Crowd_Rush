@@ -27,7 +27,7 @@ const LAYER_CROWD_SENSOR := 16
 @export var base_speed := 10.0
 @export var steer_omega := 8.5 ## critically damped spring; lower = heavier crowd
 @export var is_preview := false ## intro "ad preview" crowd: no sensor
-@export var cast_shadows := true
+@export var cast_shadows := false ## blob shadows already ground the crowd; real ones cost a full extra pass
 
 var count := 0
 var center := Vector3.ZERO

@@ -66,7 +66,8 @@ func _ready() -> void:
 
 # ------------------------------------------------------------------ API
 func set_gameplay_visible(on: bool, fade := 0.35) -> void:
-	for c: CanvasItem in [_counter, _progress, _delta_box]:
+	# the gate delta line is only shown by show_gate_delta()
+	for c: CanvasItem in [_counter, _progress]:
 		if fade <= 0.0:
 			c.modulate.a = 1.0 if on else 0.0
 		else:
@@ -164,7 +165,7 @@ func show_banner(text: String, color := Color(1, 0.85, 0.3), hold := 1.0) -> voi
 
 
 func set_letterbox(on: bool, dur := 0.5) -> void:
-	var h := 72.0 if on else 0.0
+	var h := 120.0 if on else 0.0
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(_bar_top, "custom_minimum_size:y", h, dur).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_property(_bar_bottom, "custom_minimum_size:y", h, dur).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
@@ -233,14 +234,14 @@ func _build_letterbox() -> void:
 	_bar_top = ColorRect.new()
 	_bar_top.color = Color.BLACK
 	_bar_top.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_bar_top.custom_minimum_size = Vector2(0, 72)
+	_bar_top.custom_minimum_size = Vector2(0, 120)
 	_bar_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_bar_top)
 	_bar_bottom = ColorRect.new()
 	_bar_bottom.color = Color.BLACK
 	_bar_bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	_bar_bottom.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_bar_bottom.custom_minimum_size = Vector2(0, 72)
+	_bar_bottom.custom_minimum_size = Vector2(0, 120)
 	_bar_bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_bar_bottom)
 
@@ -249,7 +250,7 @@ func _build_counter() -> void:
 	var top := VBoxContainer.new()
 	top.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	top.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	top.position.y = 14
+	top.position.y = 40 # clear of the phone's status bar / camera notch
 	top.alignment = BoxContainer.ALIGNMENT_BEGIN
 	top.add_theme_constant_override("separation", 6)
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -302,7 +303,7 @@ func _build_counter() -> void:
 
 	# progress track
 	_progress = Control.new()
-	_progress.custom_minimum_size = Vector2(360, 26)
+	_progress.custom_minimum_size = Vector2(440, 26)
 	_progress.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_progress.draw.connect(_draw_progress)
@@ -333,7 +334,7 @@ func _build_boss_bar() -> void:
 	_boss_box = VBoxContainer.new()
 	_boss_box.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_boss_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_boss_box.position.y = 112
+	_boss_box.position.y = 150
 	_boss_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	_boss_box.add_theme_constant_override("separation", 0)
 	_boss_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -341,7 +342,7 @@ func _build_boss_bar() -> void:
 	var name_l := _label("GIANT GUARD", 30, 10, Color(1.0, 0.75, 0.7))
 	_boss_box.add_child(name_l)
 	_boss_bar = Control.new()
-	_boss_bar.custom_minimum_size = Vector2(520, 30)
+	_boss_bar.custom_minimum_size = Vector2(480, 30)
 	_boss_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_boss_bar.draw.connect(func() -> void:
 		var r := Rect2(Vector2.ZERO, _boss_bar.size)
@@ -356,14 +357,21 @@ func _build_boss_bar() -> void:
 
 
 func _build_texts() -> void:
-	_cine_label = _label("", 104, 20)
+	# portrait screen: big words, wrapped onto two lines when needed
+	_cine_label = _label("", 92, 20)
 	_cine_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_cine_label.offset_top = 110
-	_cine_label.offset_bottom = 250
+	_cine_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_cine_label.offset_left = 24
+	_cine_label.offset_right = -24
+	_cine_label.offset_top = 170
+	_cine_label.offset_bottom = 400
 	_cine_label.modulate.a = 0.0
 	_root.add_child(_cine_label)
 	_banner = _label("", 76, 18, Color(1, 0.85, 0.3))
 	_banner.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_banner.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_banner.offset_left = 24
+	_banner.offset_right = -24
 	_banner.offset_top = -120
 	_banner.modulate.a = 0.0
 	_root.add_child(_banner)
@@ -376,8 +384,8 @@ func _build_result() -> void:
 	_root.add_child(center)
 	_result = PanelContainer.new()
 	var sb := _panel_style(Color(0.04, 0.06, 0.16, 0.82), 36)
-	sb.content_margin_left = 60
-	sb.content_margin_right = 60
+	sb.content_margin_left = 40
+	sb.content_margin_right = 40
 	sb.content_margin_top = 30
 	sb.content_margin_bottom = 34
 	sb.border_color = Color(1, 1, 1, 0.15)
@@ -388,7 +396,9 @@ func _build_result() -> void:
 	v.add_theme_constant_override("separation", 8)
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	_result.add_child(v)
-	_result_title = _label("LEVEL COMPLETE", 80, 18, Color(1.0, 0.85, 0.25))
+	_result_title = _label("LEVEL COMPLETE", 68, 18, Color(1.0, 0.85, 0.25))
+	_result_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_result_title.custom_minimum_size = Vector2(520, 0)
 	_result_line1 = _label("", 46, 12)
 	_result_line2 = _label("", 36, 10, Color(0.75, 0.88, 1.0))
 	v.add_child(_result_title)

@@ -1,8 +1,7 @@
 class_name DebugOverlay
 extends CanvasLayer
 ## Development-only overlay: FPS, crowd count, active physics actors, state.
-## Toggle with F6. Disabled automatically in release exports
-## (GameManager.debug_tools_enabled + OS.is_debug_build()).
+## Toggle with F6 (debug builds) or a three-finger tap (any build, phones).
 
 var game: GameManager
 var _label: Label
@@ -12,7 +11,7 @@ var _acc := 0.0
 func _ready() -> void:
 	layer = 20
 	_label = Label.new()
-	_label.position = Vector2(12, 90)
+	_label.position = Vector2(12, 150)
 	_label.add_theme_font_size_override("font_size", 16)
 	_label.add_theme_color_override("font_color", Color(0.8, 1.0, 0.8))
 	_label.add_theme_color_override("font_outline_color", Color.BLACK)

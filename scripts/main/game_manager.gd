@@ -35,6 +35,8 @@ var state: State = State.INTRO
 @onready var intro: IntroSequence = $IntroSequence
 @onready var debug_overlay: DebugOverlay = $DebugOverlay
 
+var _touches := {}
+
 var _obstacle_done := false
 var _fight_time := 0.0
 var _dmg_acc := 0.0
@@ -313,6 +315,17 @@ func _on_crowd_emptied() -> void:
 
 # ------------------------------------------------------------------ debug
 func _unhandled_input(event: InputEvent) -> void:
+	# three-finger tap toggles the FPS overlay on phones (works in release
+	# builds too, so performance can be checked on real devices)
+	if event is InputEventScreenTouch:
+		var t := event as InputEventScreenTouch
+		if t.pressed:
+			_touches[t.index] = true
+			if _touches.size() == 3:
+				debug_overlay.visible = not debug_overlay.visible
+		else:
+			_touches.erase(t.index)
+		return
 	if not (debug_tools_enabled and OS.is_debug_build()):
 		return
 	if not (event is InputEventKey) or not event.pressed or event.echo:

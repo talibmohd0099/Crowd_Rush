@@ -122,7 +122,7 @@ func attach_ambient_motes(target: Node3D) -> void:
 	_motes.lifetime = 5.0
 	_motes.preprocess = 5.0
 	_motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	_motes.emission_box_extents = Vector3(9, 3, 12)
+	_motes.emission_box_extents = Vector3(6, 3, 8)
 	_motes.direction = Vector3(0.2, 1, 0)
 	_motes.spread = 40.0
 	_motes.gravity = Vector3(0, 0.05, 0)
@@ -136,7 +136,9 @@ func attach_ambient_motes(target: Node3D) -> void:
 	_motes.local_coords = false
 	_motes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	target.add_child(_motes)
-	_motes.position = Vector3(0, -2, -10)
+	# keep them well in front of the lens: close to it they turn into big
+	# blurry blobs that cover the (narrow, portrait) screen
+	_motes.position = Vector3(0, -2, -18)
 
 
 # ------------------------------------------------------------------ configs

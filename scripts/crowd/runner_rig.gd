@@ -4,9 +4,12 @@ extends RefCounted
 ## procedural pose function. The same data drives both the MultiMesh crowd
 ## (hundreds of runners, 8 draw calls) and the few stand-alone physics actors.
 ##
-## Rig (runner local space, feet at origin, facing -Z, ~1.75 units tall):
+## Rig (runner local space, feet at origin, facing -Z, ~1.6 units tall):
 ##   BODY (hips joint) -> HEAD/HAIR (neck) -> ARM_L / ARM_R (shoulders)
-##   THIGH_L / THIGH_R (hip joints) -> SHIN_L / SHIN_R (knees)
+##   THIGH_L / THIGH_R (hip joints) -> SHIN_L / SHIN_R (knees, incl. shoes)
+## Chibi proportions: big round head (~1/3 of the height), short legs and
+## chunky sneakers, so runners read as toys even when the crowd is small on
+## a phone screen.
 ## Animation is fully procedural (no skeletons): cheap, phase-offsettable and
 ## trivially blendable, which is exactly what a crowd needs.
 
@@ -16,13 +19,15 @@ const PART_COUNT := 9
 enum Anim { IDLE, RUN, HIT, KNOCKBACK, FALL, GET_UP, VICTORY, ATTACK }
 ## TURN_LEFT / TURN_RIGHT are additive: `lean` (-1..1) leans/yaws the pose.
 
-const HIP_HEIGHT := 0.92
-const THIGH_LEN := 0.44
-const NECK := Vector3(0, 0.50, 0)
-const SHOULDER := Vector3(0.265, 0.43, 0)
-const HIP_OFFSET := 0.105
+const HIP_HEIGHT := 0.64
+const THIGH_LEN := 0.25
+const SHIN_LEN := 0.25 ## knee -> ankle; the shoe adds the last ~0.14
+const NECK := Vector3(0, 0.40, 0)
+const SHOULDER := Vector3(0.235, 0.33, 0)
+const HIP_OFFSET := 0.11
 
-const HAIR_STYLES := 2 # 0 = short hair, 1 = cap
+const HAIR_STYLES := 2 # 0 = spiky hair, 1 = cap
+const SHOE_STYLES := 4 # see Palette.SHOES
 
 static var _meshes: Dictionary = {}
 
@@ -36,56 +41,78 @@ static func mesh(part: StringName) -> ArrayMesh:
 static func _build_meshes() -> void:
 	var F := MeshFactory
 	var dark := F.col(Color(0.12, 0.12, 0.14))
+	var white := F.col(Color(0.97, 0.97, 0.97))
 	var tint := F.col(Color.WHITE, F.TINT)
 	var skin := F.col(Color.WHITE, F.SKIN)
+	var accent := F.col(Color.WHITE, F.ACCENT)
 
-	# BODY: torso (shirt tint), belt, neck, chest stripe
+	# BODY: rounded hoodie torso (shirt tint), pocket, neck
 	var st := F.begin()
-	F.box(st, F.xform(Vector3(0, 0.25, 0)), Vector3(0.36, 0.42, 0.24), tint, Vector2(1.36, 1.05))
-	F.box(st, F.xform(Vector3(0, 0.035, 0)), Vector3(0.375, 0.07, 0.255), dark)
-	F.prism(st, F.xform(Vector3(0, 0.44, 0)), 0.075, 0.07, 0.1, 6, skin)
-	F.box(st, F.xform(Vector3(0, 0.32, -0.128)), Vector3(0.16, 0.05, 0.02), F.col(Color(0.96, 0.96, 0.96)))
+	F.box(st, F.xform(Vector3(0, 0.2, 0)), Vector3(0.40, 0.34, 0.28), tint, Vector2(0.86, 0.85))
+	F.box(st, F.xform(Vector3(0, 0.04, 0)), Vector3(0.38, 0.1, 0.27), tint, Vector2(1.06, 1.04))
+	F.box(st, F.xform(Vector3(0, 0.25, -0.128)), Vector3(0.16, 0.045, 0.02), white)
+	F.prism(st, F.xform(Vector3(0, 0.35, 0)), 0.08, 0.075, 0.07, 6, skin)
 	_meshes[&"body"] = F.commit(st)
 
-	# HEAD: slightly oversized head + readable eyes/nose so facing is clear
+	# HEAD: big smooth round head, big eyes (white + pupil + shine), ears
 	st = F.begin()
-	F.sphere(st, F.xform(Vector3(0, 0.2, 0)), Vector3(0.19, 0.21, 0.19), 5, 8, skin)
-	F.box(st, F.xform(Vector3(0, 0.17, -0.19)), Vector3(0.05, 0.07, 0.05), skin)
+	F.smooth_sphere(st, F.xform(Vector3(0, 0.25, 0)), Vector3(0.27, 0.26, 0.255), 8, 14, skin)
 	for sx in [-1.0, 1.0]:
-		F.box(st, F.xform(Vector3(0.068 * sx, 0.225, -0.172)), Vector3(0.04, 0.055, 0.03), F.col(Color(0.08, 0.08, 0.1)))
+		F.box(st, F.xform(Vector3(0.095 * sx, 0.27, -0.235), Vector3(0.12, 0.0, 0.0)), Vector3(0.085, 0.1, 0.03), white)
+		F.box(st, F.xform(Vector3(0.095 * sx, 0.26, -0.252), Vector3(0.12, 0.0, 0.0)), Vector3(0.05, 0.07, 0.02), F.col(Color(0.07, 0.07, 0.1)))
+		F.box(st, F.xform(Vector3(0.105 * sx, 0.285, -0.262)), Vector3(0.018, 0.018, 0.01), white)
+		F.smooth_sphere(st, F.xform(Vector3(0.262 * sx, 0.23, 0.01)), Vector3(0.04, 0.06, 0.05), 3, 6, skin)
+	F.box(st, F.xform(Vector3(0, 0.15, -0.238), Vector3(0.25, 0, 0)), Vector3(0.09, 0.022, 0.02), F.col(Color(0.45, 0.14, 0.12)))
 	_meshes[&"head"] = F.commit(st)
 
-	# HAIR A: short hair
+	# HAIR A: spiky hair - a round cap plus tufts sweeping up and back
 	st = F.begin()
-	F.sphere(st, F.xform(Vector3(0, 0.205, 0.012)), Vector3(0.212, 0.228, 0.212), 3, 8, tint, 0.15, 1.0)
-	F.box(st, F.xform(Vector3(0, 0.16, 0.085)), Vector3(0.39, 0.2, 0.24), tint)
-	F.box(st, F.xform(Vector3(0.05, 0.37, -0.12), Vector3(0.5, 0, 0.3)), Vector3(0.16, 0.08, 0.12), tint)
+	F.sphere(st, F.xform(Vector3(0, 0.27, 0.02)), Vector3(0.285, 0.265, 0.28), 4, 12, tint, 0.05, 1.0)
+	F.box(st, F.xform(Vector3(0, 0.22, 0.1)), Vector3(0.55, 0.24, 0.34), tint, Vector2(1.0, 0.9))
+	var spikes := [
+		[Vector3(0.0, 0.47, -0.1), Vector3(-0.5, 0.0, 0.0)],
+		[Vector3(-0.13, 0.45, -0.02), Vector3(-0.2, 0.0, 0.5)],
+		[Vector3(0.13, 0.45, -0.02), Vector3(-0.2, 0.0, -0.5)],
+		[Vector3(0.0, 0.46, 0.1), Vector3(0.55, 0.0, 0.0)],
+		[Vector3(-0.12, 0.4, 0.17), Vector3(0.9, 0.0, 0.4)],
+		[Vector3(0.12, 0.4, 0.17), Vector3(0.9, 0.0, -0.4)],
+		[Vector3(0.0, 0.33, 0.25), Vector3(1.4, 0.0, 0.0)],
+	]
+	for sp in spikes:
+		F.prism(st, F.xform(sp[0] - Vector3(0, 0.06, 0), sp[1]), 0.085, 0.0, 0.16, 5, tint)
 	_meshes[&"hair_0"] = F.commit(st)
 
-	# HAIR B: baseball cap
+	# HAIR B: baseball cap (dome + button + curved brim) over short hair
 	st = F.begin()
-	F.sphere(st, F.xform(Vector3(0, 0.215, 0)), Vector3(0.218, 0.21, 0.218), 3, 8, tint, 0.2, 1.0)
-	F.box(st, F.xform(Vector3(0, 0.265, -0.205), Vector3(-0.12, 0, 0)), Vector3(0.28, 0.03, 0.2), tint)
-	F.box(st, F.xform(Vector3(0, 0.13, 0.1)), Vector3(0.34, 0.12, 0.16), F.col(Color(0.14, 0.1, 0.08)))
+	F.sphere(st, F.xform(Vector3(0, 0.29, 0)), Vector3(0.29, 0.25, 0.29), 4, 12, tint, 0.15, 1.0)
+	F.box(st, F.xform(Vector3(0, 0.54, 0)), Vector3(0.05, 0.03, 0.05), tint)
+	F.box(st, F.xform(Vector3(0, 0.33, -0.3), Vector3(-0.18, 0, 0)), Vector3(0.36, 0.035, 0.22), tint, Vector2(0.85, 1.0))
+	F.box(st, F.xform(Vector3(0, 0.18, 0.13)), Vector3(0.5, 0.16, 0.2), F.col(Color(0.14, 0.1, 0.08)))
 	_meshes[&"hair_1"] = F.commit(st)
 
-	# ARM: sleeve (shirt tint) + forearm + hand (skin). Pivot = shoulder.
+	# ARM: short puffy sleeve (shirt tint) + forearm + round hand. Pivot = shoulder.
 	st = F.begin()
-	F.box(st, F.xform(Vector3(0, -0.11, 0)), Vector3(0.14, 0.25, 0.145), tint)
-	F.box(st, F.xform(Vector3(0, -0.34, -0.035), Vector3(0.2, 0, 0)), Vector3(0.105, 0.25, 0.105), skin)
-	F.box(st, F.xform(Vector3(0, -0.5, -0.07)), Vector3(0.12, 0.11, 0.12), skin)
+	F.box(st, F.xform(Vector3(0, -0.08, 0)), Vector3(0.15, 0.2, 0.15), tint, Vector2(1.1, 1.1))
+	F.box(st, F.xform(Vector3(0, -0.23, -0.02), Vector3(0.2, 0, 0)), Vector3(0.1, 0.16, 0.1), skin)
+	F.smooth_sphere(st, F.xform(Vector3(0, -0.33, -0.045)), Vector3(0.075, 0.075, 0.075), 4, 8, skin)
 	_meshes[&"arm"] = F.commit(st)
 
-	# THIGH: tapered, pants tint. Pivot = hip joint (top overlaps pelvis).
+	# THIGH: short, pants tint. Pivot = hip joint (top overlaps pelvis).
 	st = F.begin()
-	F.box(st, F.xform(Vector3(0, -0.18, 0)), Vector3(0.155, 0.52, 0.17), tint, Vector2(1.25, 1.2))
+	F.box(st, F.xform(Vector3(0, -0.1, 0)), Vector3(0.16, 0.3, 0.17), tint, Vector2(1.2, 1.15))
 	_meshes[&"thigh"] = F.commit(st)
 
-	# SHIN: pants + sneaker. Pivot = knee.
+	# SHIN: pants + a BIG chunky sneaker (white upper, coloured toe, tongue,
+	# laces and a thick coloured sole). Pivot = knee.
 	st = F.begin()
-	F.box(st, F.xform(Vector3(0, -0.19, 0)), Vector3(0.13, 0.42, 0.14), tint, Vector2(1.1, 1.1))
-	F.box(st, F.xform(Vector3(0, -0.405, -0.05)), Vector3(0.155, 0.1, 0.3), F.col(Color(0.96, 0.96, 0.95)))
-	F.box(st, F.xform(Vector3(0, -0.455, -0.05)), Vector3(0.165, 0.03, 0.31), F.col(Color(0.2, 0.2, 0.24)))
+	var ank := -SHIN_LEN
+	F.box(st, F.xform(Vector3(0, -0.11, 0)), Vector3(0.14, 0.24, 0.15), tint, Vector2(1.1, 1.1))
+	F.box(st, F.xform(Vector3(0, ank + 0.0, 0.0)), Vector3(0.18, 0.12, 0.2), white, Vector2(0.9, 0.9))
+	F.box(st, F.xform(Vector3(0, ank - 0.035, -0.1)), Vector3(0.2, 0.11, 0.34), white, Vector2(0.9, 0.85))
+	F.box(st, F.xform(Vector3(0, ank - 0.03, -0.235)), Vector3(0.205, 0.1, 0.1), accent, Vector2(0.85, 0.7))
+	F.box(st, F.xform(Vector3(0, ank + 0.02, -0.12), Vector3(-0.35, 0, 0)), Vector3(0.12, 0.02, 0.14), accent)
+	F.box(st, F.xform(Vector3(0, ank - 0.105, -0.09)), Vector3(0.225, 0.05, 0.42), accent, Vector2(1.0, 1.0))
+	F.box(st, F.xform(Vector3(0, ank - 0.133, -0.09)), Vector3(0.23, 0.014, 0.43), F.col(Color(0.95, 0.95, 0.95)))
 	_meshes[&"shin"] = F.commit(st)
 
 
@@ -116,7 +143,7 @@ static func pose_into(out: Array[Transform3D], anim: int, phase: float, t: float
 
 	match anim:
 		Anim.RUN, Anim.HIT, Anim.GET_UP:
-			hip_y = 0.935 - 0.075 * absf(s)
+			hip_y = HIP_HEIGHT + 0.035 - 0.07 * absf(s)
 			body_pitch = -0.2 - absf(lean) * 0.08
 			body_yaw = 0.12 * s
 			head_pitch = 0.14
@@ -132,7 +159,7 @@ static func pose_into(out: Array[Transform3D], anim: int, phase: float, t: float
 				# stumble: quick recoil backwards, arms flung out, knees buckle
 				var k := sin(clampf(t / 0.55, 0.0, 1.0) * PI)
 				k = k * k * (3.0 - 2.0 * k)
-				hip_y = lerpf(hip_y, 0.78, k)
+				hip_y = lerpf(hip_y, HIP_HEIGHT - 0.1, k)
 				body_pitch = lerpf(body_pitch, 0.55, k)
 				head_pitch = lerpf(head_pitch, -0.4, k)
 				al_x = lerpf(al_x, 0.9, k)
@@ -146,7 +173,7 @@ static func pose_into(out: Array[Transform3D], anim: int, phase: float, t: float
 			elif anim == Anim.GET_UP:
 				var k2 := 1.0 - clampf(t / 0.6, 0.0, 1.0)
 				k2 = k2 * k2
-				hip_y = lerpf(hip_y, 0.55, k2)
+				hip_y = lerpf(hip_y, HIP_HEIGHT - 0.24, k2)
 				body_pitch = lerpf(body_pitch, -0.9, k2)
 				tl_x = lerpf(tl_x, 1.3, k2)
 				tr_x = lerpf(tr_x, 0.9, k2)
@@ -194,7 +221,7 @@ static func pose_into(out: Array[Transform3D], anim: int, phase: float, t: float
 			sr_x = -0.2
 		Anim.VICTORY:
 			var hop := absf(sin(t * 5.5 + phase))
-			hip_y = HIP_HEIGHT + hop * 0.45
+			hip_y = HIP_HEIGHT + hop * 0.4
 			body_pitch = 0.08
 			head_pitch = -0.25
 			var wave := sin(t * 11.0 + phase) * 0.25
@@ -268,8 +295,10 @@ static func random_look(rng: RandomNumberGenerator) -> Dictionary:
 		"pants": Palette.PANTS[rng.randi() % Palette.PANTS.size()],
 		"hair": hair_col,
 		"hair_style": style,
-		"skin": (float(rng.randi_range(0, 3)) + 0.5) / 4.0,
-		"height": rng.randf_range(0.93, 1.05),
+		# skin tone (0..3) and shoe colour (0..3) packed into one float: the
+		# crowd shader receives it as INSTANCE_CUSTOM.a (see crowd_runner.gdshader)
+		"skin": (float(rng.randi_range(0, 3) + 4 * rng.randi_range(0, SHOE_STYLES - 1)) + 0.5) / 16.0,
+		"height": rng.randf_range(0.95, 1.05),
 		"width": rng.randf_range(0.94, 1.08),
 	}
 

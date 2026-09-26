@@ -2,16 +2,22 @@ class_name CameraController
 extends Node3D
 ## Third-person elevated follow camera with game-feel helpers:
 ##  - smooth follow with a tiny lateral delay
-##  - zoom out as the crowd grows / in as it shrinks
+##  - close-up on a small crowd, pulls back smoothly as it grows
+##  - portrait aware: FOV values are authored as vertical FOV of a 16:9
+##    landscape shot and converted to a fixed horizontal FOV, so the road
+##    always fills the width of a tall phone screen
 ##  - forward "punch" on gates, trauma-based shake on impacts
 ##  - boss framing, victory orbit, and blend-in from scripted cinematics
 
 enum Mode { CINEMATIC, FOLLOW, BOSS, VICTORY }
 
-@export var follow_offset := Vector3(0, 8.2, 9.6) ## ~36 deg down-angle
-@export var look_ahead := 7.0
+@export var follow_offset := Vector3(0, 6.4, 7.2) ## ~42 deg down-angle
+@export var look_ahead := 14.0
 @export var base_fov := 58.0
-@export var max_zoom := 1.42
+@export var min_zoom := 0.62 ## camera distance multiplier for the smallest crowd
+@export var max_zoom := 1.65 ## ... and for a full crowd (MAX_CROWD)
+## Horizontal FOV = authored FOV * this (Camera3D.keep_aspect = KEEP_WIDTH).
+@export var fov_width_scale := 1.08
 @export var shake_decay := 1.9
 
 var mode: Mode = Mode.CINEMATIC
@@ -38,7 +44,8 @@ var _initialized := false
 
 
 func _ready() -> void:
-	cam.fov = base_fov
+	cam.keep_aspect = Camera3D.KEEP_WIDTH
+	cam.fov = base_fov * fov_width_scale
 	cam.near = 0.15
 	cam.far = 900.0
 	cam.current = true
@@ -59,7 +66,7 @@ func set_mode(m: Mode, blend_time := 1.0) -> void:
 	if m == mode:
 		return
 	_blend_from = cam.global_transform
-	_blend_from_fov = cam.fov
+	_blend_from_fov = cam.fov / fov_width_scale
 	_blend_t = 0.0
 	_blend_dur = maxf(blend_time, 0.001)
 	if mode == Mode.CINEMATIC or not _initialized:
@@ -102,14 +109,17 @@ func _snap_follow() -> void:
 	_initialized = true
 
 
+## Distance multiplier for a crowd of n: close when small, far when big.
+## sqrt: the crowd's area grows with n, so its footprint grows with sqrt(n).
 func _zoom_for(n: int) -> float:
-	return lerpf(1.0, max_zoom, clampf((n - 5) / 110.0, 0.0, 1.0))
+	var k := clampf((sqrt(float(maxi(n, 1))) - sqrt(3.0)) / (sqrt(float(CrowdManager.MAX_CROWD)) - sqrt(3.0)), 0.0, 1.0)
+	return lerpf(min_zoom, max_zoom, k)
 
 
 func _follow_targets(z: float) -> Array[Vector3]:
 	var c := crowd.get_center()
 	var pos := Vector3(c.x * 0.55, 0.0, c.z) + follow_offset * z
-	var look := Vector3(c.x * 0.8, 0.6, c.z - look_ahead * z)
+	var look := Vector3(c.x * 0.8, 0.0, c.z - look_ahead * z)
 	return [pos, look]
 
 
@@ -168,4 +178,4 @@ func _process(delta: float) -> void:
 		xf.origin += xf.basis.x * ox * s * 0.55 + xf.basis.y * oy * s * 0.45
 		xf.basis = xf.basis * Basis(Vector3.FORWARD, sin(_time * 37.0) * s * 0.03)
 	cam.global_transform = xf
-	cam.fov = clampf(fov, 5.0, 100.0)
+	cam.fov = clampf(fov * fov_width_scale, 5.0, 110.0)

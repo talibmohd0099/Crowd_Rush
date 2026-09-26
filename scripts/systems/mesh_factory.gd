@@ -12,6 +12,7 @@ extends RefCounted
 
 const TINT := 1.0
 const SKIN := 0.5
+const ACCENT := 0.2 ## runners only: per-runner shoe colour
 const FIXED := 0.0
 
 
@@ -108,6 +109,59 @@ static func prism(st: SurfaceTool, xf: Transform3D, r_bottom: float, r_top: floa
 				tri(st, cb, bottom[i], bottom[j], color, inside)
 			if r_top > 0.0001:
 				tri(st, ct, top[i], top[j], color, inside)
+
+
+## Smooth-shaded ellipsoid (per-vertex normals) for soft, toy-like parts such
+## as the runners' heads. Always closed (full sphere).
+static func smooth_sphere(st: SurfaceTool, xf: Transform3D, radii: Vector3, rings: int, segments: int, color: Color) -> void:
+	var nb := xf.basis.inverse().transposed()
+	var pts: Array = []
+	var nrm: Array = []
+	for r in rings + 1:
+		var phi := lerpf(-PI * 0.5, PI * 0.5, float(r) / float(rings))
+		var prow: Array[Vector3] = []
+		var nrow: Array[Vector3] = []
+		for sg in segments:
+			var th := TAU * float(sg) / float(segments)
+			var u := Vector3(cos(phi) * cos(th), sin(phi), cos(phi) * sin(th))
+			prow.append(xf * (u * radii))
+			nrow.append((nb * (u / radii)).normalized())
+		pts.append(prow)
+		nrm.append(nrow)
+	for r in rings:
+		for sg in segments:
+			var t := (sg + 1) % segments
+			var a: Vector3 = pts[r][sg]
+			var b: Vector3 = pts[r][t]
+			var c: Vector3 = pts[r + 1][t]
+			var d: Vector3 = pts[r + 1][sg]
+			var na: Vector3 = nrm[r][sg]
+			var nb2: Vector3 = nrm[r][t]
+			var nc: Vector3 = nrm[r + 1][t]
+			var nd: Vector3 = nrm[r + 1][sg]
+			if r > 0:
+				_tri_n(st, a, b, c, na, nb2, nc, color)
+			if r < rings - 1:
+				_tri_n(st, a, c, d, na, nc, nd, color)
+
+
+## Triangle with explicit vertex normals, wound to face along the normals.
+static func _tri_n(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, na: Vector3, nb: Vector3, nc: Vector3, color: Color) -> void:
+	var fn := (b - a).cross(c - a)
+	if fn.length_squared() < 1e-14:
+		return
+	if fn.dot(na + nb + nc) < 0.0:
+		var tp := b
+		b = c
+		c = tp
+		var tn := nb
+		nb = nc
+		nc = tn
+	# Godot uses clockwise winding for front faces -> emit a, c, b.
+	for v in [[a, na], [c, nc], [b, nb]]:
+		st.set_color(color)
+		st.set_normal(v[1])
+		st.add_vertex(v[0])
 
 
 ## Low-poly ellipsoid (flat shaded). `radii` per axis.

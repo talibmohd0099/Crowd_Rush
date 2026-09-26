@@ -1,0 +1,59 @@
+[gd_scene load_steps=17 format=3]
+
+[ext_resource type="Script" path="res://scripts/main/game_manager.gd" id="1_gm"]
+[ext_resource type="PackedScene" path="res://scenes/environment/Environment.tscn" id="2_env"]
+[ext_resource type="Script" path="res://scripts/main/level_manager.gd" id="3_lvl"]
+[ext_resource type="Script" path="res://scripts/gates/gate_manager.gd" id="4_gates"]
+[ext_resource type="PackedScene" path="res://scenes/gates/ObstacleBarrier.tscn" id="5_obs"]
+[ext_resource type="PackedScene" path="res://scenes/boss/BossArena.tscn" id="6_arena"]
+[ext_resource type="PackedScene" path="res://scenes/boss/Boss.tscn" id="7_boss"]
+[ext_resource type="PackedScene" path="res://scenes/crowd/Crowd.tscn" id="8_crowd"]
+[ext_resource type="Script" path="res://scripts/crowd/crowd_manager.gd" id="9_cm"]
+[ext_resource type="PackedScene" path="res://scenes/player/CameraRig.tscn" id="10_cam"]
+[ext_resource type="Script" path="res://scripts/player/input_controller.gd" id="11_in"]
+[ext_resource type="Script" path="res://scripts/systems/audio_manager.gd" id="12_audio"]
+[ext_resource type="Script" path="res://scripts/systems/vfx_manager.gd" id="13_vfx"]
+[ext_resource type="PackedScene" path="res://scenes/main/IntroSequence.tscn" id="14_intro"]
+[ext_resource type="PackedScene" path="res://scenes/ui/HUD.tscn" id="15_hud"]
+[ext_resource type="Script" path="res://scripts/systems/debug_overlay.gd" id="16_dbg"]
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_gm")
+
+[node name="Environment" parent="." instance=ExtResource("2_env")]
+
+[node name="Level" type="Node3D" parent="."]
+script = ExtResource("3_lvl")
+
+[node name="GateManager" type="Node" parent="Level"]
+script = ExtResource("4_gates")
+
+[node name="ObstacleBarrier" parent="Level" instance=ExtResource("5_obs")]
+
+[node name="BossArena" parent="Level" instance=ExtResource("6_arena")]
+
+[node name="Boss" parent="Level" instance=ExtResource("7_boss")]
+
+[node name="Crowd" parent="." instance=ExtResource("8_crowd")]
+
+[node name="PreviewCrowd" type="Node3D" parent="."]
+script = ExtResource("9_cm")
+is_preview = true
+
+[node name="CameraRig" parent="." instance=ExtResource("10_cam")]
+
+[node name="InputController" type="Node" parent="."]
+script = ExtResource("11_in")
+
+[node name="AudioManager" type="Node" parent="."]
+script = ExtResource("12_audio")
+
+[node name="VFXManager" type="Node3D" parent="."]
+script = ExtResource("13_vfx")
+
+[node name="IntroSequence" parent="." instance=ExtResource("14_intro")]
+
+[node name="HUD" parent="." instance=ExtResource("15_hud")]
+
+[node name="DebugOverlay" type="CanvasLayer" parent="."]
+script = ExtResource("16_dbg")

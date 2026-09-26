@@ -201,6 +201,40 @@ godot --headless --path . -s tools/perf_test.gd                               # 
    Orientation comes from `display/window/handheld/orientation = sensor landscape`; immersive mode is on;
    no permissions are requested (not even INTERNET).
 
+### Build the APK on GitHub (no local setup)
+
+The workflow `.github/workflows/android-apk.yml` builds the APK in GitHub Actions and publishes it as a
+**GitHub Release**:
+
+1. GitHub → **Actions** → **Build Android APK** → **Run workflow**.
+2. Enter a version name (e.g. `0.1.0`) → **Run workflow**. A build takes about 5–10 minutes (faster once Godot is cached).
+3. When it finishes, open **Releases** (right side of the repo page): release `v0.1.0` has
+   `CrowdRush-v0.1.0.apk` attached. Download it on your phone and install it
+   (allow "Install unknown apps" when asked). The APK is also kept as a workflow artifact for 14 days.
+
+Running it again with the same version name updates that release; use a new version name for a new release.
+The Android `versionCode` is the workflow run number, so it always increases.
+
+**Signing (recommended once):** without secrets, each build is signed with a new throwaway key, so Android
+refuses to install it *over* the previous build — uninstall first. To sign every build with the same key,
+create a keystore once and add three repository secrets (**Settings → Secrets and variables → Actions**):
+
+```
+keytool -genkeypair -v -keystore crowdrush.keystore -alias crowdrush -keyalg RSA -keysize 2048 -validity 10000
+base64 -w0 crowdrush.keystore        # on macOS: base64 -i crowdrush.keystore
+```
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | the base64 output |
+| `ANDROID_KEYSTORE_ALIAS` | `crowdrush` |
+| `ANDROID_KEYSTORE_PASSWORD` | the password you chose |
+
+Keep the keystore file safe and never commit it — you need the same key for all future updates
+(and for Google Play).
+
+The same build runs locally with `tools/ci/build_android.sh` (see the variables at the top of the script).
+
 ## 10. Performance notes
 
 * **Crowd CPU** (desktop core, `tools/perf_test.gd`): 5 → 0.03 ms, 80 → 0.42 ms, 150 → 0.72 ms per frame
